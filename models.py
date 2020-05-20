@@ -1,8 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin 
 
 db = SQLAlchemy()
 
-class User(db.Model):
+# UserMixin nak no flask_login un nemaina datu bazi
+class User(UserMixin, db.Model):
     """ User model """
 
     __tablename__ = "users"
