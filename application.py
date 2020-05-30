@@ -1,16 +1,24 @@
+import os
+
+from time import localtime, strftime
 from flask import Flask, render_template, redirect, url_for, flash
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
+from flask_socketio import SocketIO, send, emit, join_room, leave_room
 
 from wtform_fields import *
 from models import *
 
 # Configure app
 app = Flask(__name__)
-app.secret_key = 'replace later'
+app.secret_key = os.environ.get('SECRET')
 
 # Configure database
-app.config['SQLALCHEMY_DATABASE_URI']='postgres://sihcdnngjcrgmr:09b562cf4d1a6a73e3a1d220c4ab956149ce0b57519b8919212dc7cb9db051ec@ec2-176-34-97-213.eu-west-1.compute.amazonaws.com:5432/d5omachmrnjaa'
+app.config['SQLALCHEMY_DATABASE_URI']=os.environ.get('DATABASE_URL')
 db = SQLAlchemy(app)
+
+# Initialize Flask-SocketIO
+socketio = SocketIO(app)
+ROOMS = ["lounge", "news", "games", "coding"]
 
 #Configure flask login
 login = LoginManager(app)
@@ -63,11 +71,11 @@ def login():
 # @login_required
 def chat():
 
-    if not current_user.is_authenticated:
-        flash('Please login.', 'darger')
-        return redirect(url_for('login'))
+    #if not current_user.is_authenticated:
+    #    flash('Please login.', 'darger')
+    #    return redirect(url_for('login'))
 
-    return "Chat with me"
+    return render_template('chat.html', username=current_user.username, rooms=ROOMS)
 
 @app.route("/logout", methods=['GET'])
 def logout():
@@ -76,5 +84,24 @@ def logout():
     flash('You have logged our successfully', 'success')
     return redirect(url_for('login'))
 
+@socketio.on('message')
+def message(data):
+
+    print(f"\n\n{data}\n\n")
+    send({'msg': data['msg'], 'username': data['username'], 'time_stamp': strftime('%b-%d %I:%M %p', localtime())}, room=data['room'])
+
+@socketio.on('join')
+def join(data):
+
+    join_room(data['room'])
+    send({'msg': data['username'] + " has joined the " + data['room'] + " room."}, room=data['room'])
+
+@socketio.on('leave')
+def leave(data):
+
+    leave_room(data['room'])
+    send({'msg': data['username'] + " has left the " + data['room'] + " room."}, room=data['room'])
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
